@@ -31,18 +31,15 @@
                 <a href="/posts/<%= post._id %>"><div class="ellipsis"><%= post.title %></div></a>
               </td>
               <td class="date">
-                <span data-date="<%= post.createdAt %>"></span> <!-- 1 -->
+                <span data-date="<%= post.createdAt %>"></span>
               </td>
             </tr>
           <% }) %>
         </tbody>
-
       </table>
-
       <div>
         <a class="btn btn-primary" href="/posts/new">New</a>
       </div>
-
     </div>
   </body>
 </html>
