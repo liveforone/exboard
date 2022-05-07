@@ -1,7 +1,7 @@
 // <User.js> //
 //==dependencies==//
-const { use } = require('express/lib/application');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 
 //==schema==//
@@ -56,7 +56,7 @@ userSchema.path('password').validate(function(v) {
         if(!user.currentPasswowrd) {
             user.invalidate('currentPassword', 'Current Password is required!');
         }
-        else if(user.currentPasswowrd != user.originalPassword) {
+        else if(!bcrypt.compareSync(user.currentPassword, user.originalPassword)){ 
             user.invalidate('currentPassword', 'Current Password is invalid!');
         }
 
@@ -65,6 +65,26 @@ userSchema.path('password').validate(function(v) {
         }
     }
 });
+
+
+//==hash password==//
+userSchema.pre('save', (next) => {
+    let user = this;
+    if(!user.isModified('password')) {
+        return next();
+    } else {
+        user.password = bcrypt.hashSync(user.password);
+        return next();
+    }
+});
+
+
+//==model methods==//
+userSchema.methods.authenticate = function (password) {
+    var user = this;
+    return bcrypt.compareSync(password,user.password);
+};
+
 
 const User = mongoose.model('user', userSchema);
 module.exports = User;
