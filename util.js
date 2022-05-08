@@ -2,10 +2,12 @@
 //==dependencies==//
 const util = {};
 
+
 /*
 mongoose에서 내는 에러와 mongoDB에서 내는 에러의 형태가 
 다르기 때문에 이 함수를 통해 에러의 형태를 통합시킨다.
 */
+//==error==//
 util.parseError = function(errors){
   let parsed = {};
   if(errors.name == 'ValidationError'){
@@ -21,6 +23,22 @@ util.parseError = function(errors){
     parsed.unhandled = JSON.stringify(errors);
   }
   return parsed;
+}
+
+
+//==접근 제한==//
+util.isLoggedin = function(req, res, next) {
+  if(req.isAuthenticated()) {
+    next();
+  } else {
+    req.flash('errors', {login:'Please login first'});
+    res.redirect('/login');
+  }
+}
+util.noPermission = function(req, res) {
+  req.flash('errors', {login:'You don\'t have permission'});
+  req.logout();
+  res.redirect('/login');
 }
 
 module.exports = util;

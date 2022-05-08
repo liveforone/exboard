@@ -18,13 +18,13 @@ router.get('/', (req, res) => {
     });
 });
 //New//
-router.get('/new', (req, res) => {
+router.get('/new', util.isLoggedin, (req, res) => {
   let post = req.flash('post')[0] || {};
   let errors = req.flash('errors')[0] || {};
   res.render('posts/new', { post:post, errors:errors });
 });
 //create//
-router.post('/', (req, res) => {
+router.post('/', util.isLoggedin, (req, res) => {
   req.body.author = req.user._id;
   Post.create(req.body, (err, post) => {
     if(err) {
@@ -45,7 +45,7 @@ router.get('/:id', (req, res) => {
     })
 });
 //edit//
-router.get('/:id/edit', (req, res) => {
+router.get('/:id/edit', util.isLoggedin, checkPermission, (req, res) => {
   let post = req.flash('post')[0];
   let errors = req.flash('errors')[0] || {};
   if(!post) {
@@ -59,7 +59,7 @@ router.get('/:id/edit', (req, res) => {
   }
 });
 //update//
-router.put('/:id', (req, res) => {
+router.put('/:id', util.isLoggedin, checkPermission, (req, res) => {
   req.body.updatedAt = Date.now();
   Post.findOneAndUpdate({_id:req.params.id}, req.body, {runValidators:true}, (err, post) => {
     if(err) {
@@ -71,7 +71,7 @@ router.put('/:id', (req, res) => {
   });
 });
 //destroy//
-router.delete('/:id', (req, res) => {
+router.delete('/:id', util.isLoggedin, checkPermission, (req, res) => {
   Post.deleteOne({_id:req.params.id}, (err) => {
     if(err) return res.json(err);
     res.redirect('/posts');
@@ -79,3 +79,13 @@ router.delete('/:id', (req, res) => {
 });
 
 module.exports = router;
+
+
+//==private functions==//
+function checkPermission(req, res, next) {
+  Post.findOne({_id:req.params.id}, (err, post) => {
+    if(err) return res.json(err);
+    if(post.author != req.user.id) return util.noPermission(req, res);
+    next();
+  });
+}

@@ -7,15 +7,6 @@ const util = require('../util');
 
 
 //==routing==//
-//Index//
-router.get('/', (req, res) => {
-  User.find({})
-    .sort({username:1})
-    .exec((err, users) => {
-      if(err) return res.json(err);
-      res.render('users/index', {users:users});
-    });
-});
 //New//
 router.get('/new', (req, res) => {
   let user = req.flash('user')[0] || {};
@@ -34,14 +25,14 @@ router.post('/', (req, res) => {
   });
 });
 //show//
-router.get('/:username', (req, res) => {
+router.get('/:username', util.isLoggedin, checkPermission, (req, res) => {
   User.findOne({username:req.params.username}, (err, user) => {
     if(err) return res.json(err);
     res.render('users/show', {user:user});
   });
 });
 //edit//
-router.get('/:username/edit', (req, res) => {
+router.get('/:username/edit', util.isLoggedin, checkPermission, (req, res) => {
   let user = req.flash('user')[0];
   let errors = req.flash('errors')[0] || {};
   if(!user) {
@@ -54,7 +45,7 @@ router.get('/:username/edit', (req, res) => {
   }
 });
 //update//
-router.put('/:username', (req, res, next) => {
+router.put('/:username', util.isLoggedin, checkPermission, (req, res, next) => {
   User.findOne({username:req.params.username})
     .select('password')
     .exec((err, user) => {
@@ -78,12 +69,15 @@ router.put('/:username', (req, res, next) => {
       });
     });
 });
-//destroy//
-router.delete('/:username', (req, res) => {
-  User.deleteOne({username:req.params.username}, (err) => {
-    if(err) return res.json(err);
-    res.redirect('/users');
-  });
-});
 
 module.exports = router;
+
+
+//==private functions==//
+function checkPermission(req, res, next){
+  User.findOne({username:req.params.username}, (err, user) => {
+   if(err) return res.json(err);
+   if(user.id != req.user.id) return util.noPermission(req, res);
+   next();
+  });
+}
