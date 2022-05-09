@@ -20,10 +20,12 @@ router.get('/', async (req, res) => {
   page = !isNaN(page) ? page : 1;
   limit = !isNaN(limit) ? limit : 10;
 
+  let searchQuery = createSearchQuery(req.query);
+
   let skip = (page-1) * limit;
-  let count = await Post.countDocuments({});
+  let count = await Post.countDocuments(searchQuery);
   let maxPage = Math.ceil(count/limit);
-  let posts = await Post.find({})
+  let posts = await Post.find(searchQuery)
     .populate('author')  //Model.populate()함수는 relationship이 형성되어 있는 항목의 값을 생성해줌
     .sort('-createdAt')
     .skip(skip)
@@ -34,7 +36,9 @@ router.get('/', async (req, res) => {
     posts:posts,
     currentPage:page,
     maxPage:maxPage,
-    limit:limit
+    limit:limit,
+    searchType:req.query.searchType,
+    searchText:req.query.searchText
   });
 });
 //New//
@@ -50,9 +54,13 @@ router.post('/', util.isLoggedin, (req, res) => {
     if(err) {
       req.flash('post', req.body);
       req.flash('errors', util.parseError(err));
-      return res.redirect('/posts/new');
+      return res.redirect('/posts/new'+res.locals.getPostQueryString());
     }
-    res.redirect('/posts');
+    res.redirect('/posts'+res.locals.getPostQueryString(false, {page:1, searchText:''}));
+    /*
+    첫번째 파라미터는 optional이지만 첫번째 파라미터없이 두번째 파라ㅁ;터를 전달할 수 없으므로, 
+    (false, {page:1})를 사용합니다.
+    */
   });
 });
 //show//
@@ -85,16 +93,16 @@ router.put('/:id', util.isLoggedin, checkPermission, (req, res) => {
     if(err) {
       req.flash('post', req.body);
       req.flash('errors', util.parseError(err));
-      return res.redirect('/posts/'+req.params.id+'/edit');
+      return res.redirect('/posts/'+req.params.id+'/edit'+res.locals.getPostQueryString());
     }
-    res.redirect('/posts/'+req.params.id);
+    res.redirect('/posts/'+req.params.id+res.locals.getPostQueryString());
   });
 });
 //destroy//
 router.delete('/:id', util.isLoggedin, checkPermission, (req, res) => {
   Post.deleteOne({_id:req.params.id}, (err) => {
     if(err) return res.json(err);
-    res.redirect('/posts');
+    res.redirect('/posts'+res.locals.getPostQueryString());
   });
 });
 
@@ -108,4 +116,27 @@ function checkPermission(req, res, next) {
     if(post.author != req.user.id) return util.noPermission(req, res);
     next();
   });
+}
+
+function createSearchQuery(queries) { 
+  let searchQuery = {};
+  if(queries.searchType && queries.searchText && queries.searchText.length >= 3) {
+    /*
+    query에 searchType, searchText가 존재하고, 
+    searchText가 3글자 이상인 경우에만 search query를 만들고, 
+    이외의 경우에는 {}를 전달하여 모든 게시물이 검색되도록 합니다.
+    */
+    let searchTypes = queries.searchType.toLowerCase().split(',');
+    let postQueries = [];
+    if(searchTypes.indexOf('title')>=0) {
+      postQueries.push({ title: { $regex: new RegExp(queries.searchText, 'i') } });
+    }
+
+    if(searchTypes.indexOf('body')>=0) {
+      postQueries.push({ body: { $regex: new RegExp(queries.searchText, 'i') } });
+    }
+
+    if(postQueries.length > 0) searchQuery = {$or:postQueries};
+  }
+  return searchQuery;
 }

@@ -41,4 +41,34 @@ util.noPermission = function(req, res) {
   res.redirect('/login');
 }
 
+
+//==query string middlewre==//
+/*
+res.locals에 getPostQueryString함수를 추가하는 middleware입니다. 
+이렇게 res.locals에 추가된 변수나 함수는 view에서 바로 사용할 수 있고,
+ res.locals.getPostQueryString의 형식으로 
+ route에서도 사용할 수 있게 됩니다.
+*/
+util.getPostQueryString = function(req, res, next) {
+  res.locals.getPostQueryString = function(isAppended=false, overwrites={}) {
+    let queryString = '';
+    let queryArray = [];
+    let page = overwrites.page ? overwrites.page : (req.query.page ? req.query.page : '');
+    let limit = overwrites.limit ? overwrites.limit : (req.query.limit ? req.query.limit : '');
+    let searchType = overwrites.searchType ? overwrites.searchType : (req.query.searchType ? req.query.searchType : '');
+    let searchText = overwrites.searchText ? overwrites.searchText : (req.query.searchText ? req.query.searchText : '');
+
+    if(page) queryArray.push('page=' + page);
+    if(limit) queryArray.push('limit=' + limit);
+    if(searchType) queryArray.push('searchType='+searchType);
+    if(searchText) queryArray.push('searchText='+searchText);
+
+    if(queryArray.length > 0) queryString = (isAppended ? '&' : '?') + queryArray.join('&');
+
+    return queryString;
+  }
+  next();
+}
+
+
 module.exports = util;

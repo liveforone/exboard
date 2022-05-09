@@ -7,6 +7,7 @@ const methodOverride = require('method-override');
 const flash = require('connect-flash');
 const session = require('express-session');
 const passport = require('./config/passport');
+const util = require('./util');
 const app = express();
 const port = 3000;
 
@@ -44,7 +45,7 @@ app.use((req, res, next) => {
 
 //==routing==//
 app.use('/', require('./routes/home'));
-app.use('/posts', require('./routes/posts'));
+app.use('/posts', util.getPostQueryString, require('./routes/posts'));
 app.use('/users', require('./routes/users'));
 
 
