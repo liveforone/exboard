@@ -8,14 +8,34 @@ const util = require('../util');
 
 //==routing==/
 //Index//
-router.get('/', (req, res) => {
-  Post.find({})
+/*
+await 을 사용하기 위해 함수에 async를 붙임
+Query string은 문자열로 전달되기 때문에 parseInt사용
+await은 해당 객체가 완료될 때까지 다음 코드로 진행하지 않고 
+기다렸다가 해당 객체가 완료되면 값을 반환합니다.
+*/
+router.get('/', async (req, res) => {
+  let page = Math.max(1, parseInt(req.query.page));
+  let limit = Math.max(1, parseInt(req.query.limit));
+  page = !isNaN(page) ? page : 1;
+  limit = !isNaN(limit) ? limit : 10;
+
+  let skip = (page-1) * limit;
+  let count = await Post.countDocuments({});
+  let maxPage = Math.ceil(count/limit);
+  let posts = await Post.find({})
     .populate('author')  //Model.populate()함수는 relationship이 형성되어 있는 항목의 값을 생성해줌
     .sort('-createdAt')
-    .exec((err, posts) => {
-      if(err) return res.json(err);
-      res.render('posts/index', {posts:posts});
-    });
+    .skip(skip)
+    .limit(limit)
+    .exec();
+
+  res.render('posts/index', {
+    posts:posts,
+    currentPage:page,
+    maxPage:maxPage,
+    limit:limit
+  });
 });
 //New//
 router.get('/new', util.isLoggedin, (req, res) => {
