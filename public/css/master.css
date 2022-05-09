@@ -19,8 +19,9 @@ body {
   width: 100px;
 }
 
-.post-body{
-  white-space: pre-line; /* 2 */
+.post-body,
+.comment-text {
+  white-space: pre-line; 
 }
 .post-info{
   font-size: 0.8em;
@@ -40,4 +41,7 @@ body {
 }
 .post-index-tool input[type='text']{
   max-width: 130px;
+}
+.highlighted {
+  background-color: yellow;
 }

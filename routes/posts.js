@@ -3,6 +3,8 @@
 const express  = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
+const User = require('../models/User');
+const Comment = require('../models/Comment');
 const util = require('../util');
 
 
@@ -20,17 +22,21 @@ router.get('/', async (req, res) => {
   page = !isNaN(page) ? page : 1;
   limit = !isNaN(limit) ? limit : 10;
 
-  let searchQuery = createSearchQuery(req.query);
-
   let skip = (page-1) * limit;
-  let count = await Post.countDocuments(searchQuery);
-  let maxPage = Math.ceil(count/limit);
-  let posts = await Post.find(searchQuery)
-    .populate('author')  //Model.populate()함수는 relationship이 형성되어 있는 항목의 값을 생성해줌
-    .sort('-createdAt')
-    .skip(skip)
-    .limit(limit)
-    .exec();
+  let maxPage = 0;
+  let searchQuery = await createSearchQuery(req.query);
+  let posts = [];
+
+  if(searchQuery) {
+    let count = await Post.countDocuments(searchQuery);
+    maxPage = Math.ceil(count/limit);
+    posts = await Post.find(searchQuery)
+      .populate('author')  //Model.populate()함수는 relationship이 형성되어 있는 항목의 값을 생성해줌
+      .sort('-createdAt')
+      .skip(skip)
+      .limit(limit)
+      .exec();
+  }
 
   res.render('posts/index', {
     posts:posts,
@@ -65,12 +71,26 @@ router.post('/', util.isLoggedin, (req, res) => {
 });
 //show//
 router.get('/:id', (req, res) => {
-  Post.findOne({_id:req.params.id})
-    .populate('author')
-    .exec((err, post) => {
-      if(err) return res.json(err);
-      res.render('posts/show', {post:post});
-    })
+  let commentForm = req.flash('commentForm')[0] || {_id: null, form: {}};
+  let commentError = req.flash('commentError')[0] || {_id: null, parentComment: null, errors:{}};
+
+  /*
+  Promise.all 함수는 Promise 배열을 인자로 받고, 
+  전달 받은 모든 Promise들이 resolve될 때까지 기다렸다가 
+  resolve된 데이터들를 같은 순서의 배열로 만들어 
+  다음 callback으로 전달합니다.
+  */
+  Promise.all([
+    Post.findOne({_id:req.params.id}).populate({path:'author', select:'username'}),
+    Comment.find({post:req.params.id}).sort('createdAt').populate({path:'author', select:'username'})
+  ])
+  .then(([post, comments]) => {
+    res.render('posts/show', {post:post, comments:comments, commentForm:commentForm, commentError:commentError});
+  })
+  .catch((err) => {
+    console.log('err: ', err);
+    return res.json(err);
+  });
 });
 //edit//
 router.get('/:id/edit', util.isLoggedin, checkPermission, (req, res) => {
@@ -118,7 +138,7 @@ function checkPermission(req, res, next) {
   });
 }
 
-function createSearchQuery(queries) { 
+async function createSearchQuery(queries) { 
   let searchQuery = {};
   if(queries.searchType && queries.searchText && queries.searchText.length >= 3) {
     /*
@@ -128,6 +148,7 @@ function createSearchQuery(queries) {
     */
     let searchTypes = queries.searchType.toLowerCase().split(',');
     let postQueries = [];
+
     if(searchTypes.indexOf('title')>=0) {
       postQueries.push({ title: { $regex: new RegExp(queries.searchText, 'i') } });
     }
@@ -136,7 +157,20 @@ function createSearchQuery(queries) {
       postQueries.push({ body: { $regex: new RegExp(queries.searchText, 'i') } });
     }
 
+    if(searchTypes.indexOf('author!') >= 0) {
+      let user = await User.findOne({username: queries.searchText}).exec();
+      if(user) postQueries.push({author:user._id});
+    } else if (searchTypes.indexOf('author') >= 0) {
+      let users = await User.find({username: {$regex: new RegExp(queries.searchText, 'i')}}).exec();
+      let userIds = [];
+      for(let user of users) {
+        userIds.push(user._id);
+      }
+      if(userIds.length > 0) postQueries.push({author:{$in:userIds}});
+    }
+
     if(postQueries.length > 0) searchQuery = {$or:postQueries};
+    else searchQuery = null;
   }
   return searchQuery;
 }
